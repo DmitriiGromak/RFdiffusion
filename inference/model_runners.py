@@ -1,4 +1,6 @@
 import torch
+from torch.serialization import add_safe_globals
+add_safe_globals([slice])
 import numpy as np
 from omegaconf import DictConfig, OmegaConf
 from RoseTTAFoldModel import RoseTTAFoldModule
