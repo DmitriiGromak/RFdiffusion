@@ -418,15 +418,45 @@ class Denoise:
 
         return Ca_grads
 
+    def get_potential_gradients_seq(self, xyz, diffusion_mask, seq):
+        """
+        Same as get_potential_gradients but for potentials with sequence
+        """
+
+        # seq.requires_grad = True
+        xyz.requires_grad = True
+
+        if not xyz.grad is None:
+            xyz.grad.zero_()
+
+        current_potential = self.potential_manager.compute_all_potentials_seq(xyz, seq)
+        current_potential.backward()
+
+        # Since we are not moving frames, Cb grads are same as Ca grads
+        # Need access to calculated Cb coordinates to be able to get Cb grads though
+        Ca_grads = xyz.grad[:, 1, :]
+
+        if not diffusion_mask == None:
+            Ca_grads[diffusion_mask, :] = 0
+
+        # check for NaN's
+        if torch.isnan(Ca_grads).any():
+            print("WARNING: NaN in potential seq_gradients, replacing with zero grad.")
+            Ca_grads[:] = 0
+
+        return Ca_grads
+
     def get_next_pose(
-        self,
-        xt,
-        px0,
-        t,
-        diffusion_mask,
-        fix_motif=True,
-        align_motif=True,
-        include_motif_sidechains=True,
+            self,
+            xt,
+            px0,
+            t,
+            diffusion_mask,
+            fix_motif=True,
+            align_motif=True,
+            include_motif_sidechains=True,
+            seq=None,
+            xt_full=None,
     ):
         """
         Wrapper function to take px0, xt and t, and to produce xt-1
@@ -448,6 +478,10 @@ class Denoise:
             align_motif (bool): Align the model's prediction of the motif to the input motif
 
             include_motif_sidechains (bool): Provide sidechains of the fixed motif to the model
+
+            seq (string): Sequence of amino acids
+
+            xt_full (torch.tensor): Coordinates with sidechains from sequence and rotational frames
         """
 
         get_allatom = ComputeAllAtomCoords().to(device=xt.device)
@@ -501,6 +535,13 @@ class Denoise:
         )
 
         ca_deltas += self.potential_manager.get_guide_scale(t) * grad_ca
+
+        if seq is not None:
+            grad_ca_seq = self.get_potential_gradients_seq(
+                xt_full.clone(), diffusion_mask=diffusion_mask, seq=seq
+            )
+
+            ca_deltas += self.potential_manager.get_guide_scale_seq(t) * grad_ca_seq
 
         # add the delta to the new frames
         frames_next = torch.from_numpy(frames_next) + ca_deltas[:, None, :]  # translate
