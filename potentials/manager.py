@@ -123,6 +123,13 @@ class PotentialManager:
 
         return len(self.potentials_to_apply) == 0
 
+    def is_empty_seq(self):
+        '''
+            Same but for sequence
+        '''
+
+        return len(self.potentials_to_apply_seq) == 0
+
     def parse_potential_string(self, potstr):
         '''
             Parse a single entry in the list of potentials to be run to a dictionary of settings for that potential.

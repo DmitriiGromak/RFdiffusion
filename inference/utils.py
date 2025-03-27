@@ -423,6 +423,9 @@ class Denoise:
         Same as get_potential_gradients but for potentials with sequence
         """
 
+        if self.potential_manager == None or self.potential_manager.is_empty_seq():
+            return torch.zeros(xyz.shape[0], 3)
+
         # seq.requires_grad = True
         xyz.requires_grad = True
 
