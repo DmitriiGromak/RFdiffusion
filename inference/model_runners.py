@@ -51,16 +51,16 @@ def predict_sequence_for_complex(model, px0, target_seq, binderlen, device, temp
         'O_chain_A': backbone_coords[binderlen:, 3].cpu().numpy().tolist(),
     }
     coords_dict_B = {
-        f'N_chain_B': backbone_coords[:binderlen, 0].cpu().numpy().tolist(),
-        f'CA_chain_B': backbone_coords[:binderlen, 1].cpu().numpy().tolist(),
-        f'C_chain_B': backbone_coords[:binderlen, 2].cpu().numpy().tolist(),
-        f'O_chain_B': backbone_coords[:binderlen, 3].cpu().numpy().tolist(),
+        'N_chain_B': backbone_coords[:binderlen, 0].cpu().numpy().tolist(),
+        'CA_chain_B': backbone_coords[:binderlen, 1].cpu().numpy().tolist(),
+        'C_chain_B': backbone_coords[:binderlen, 2].cpu().numpy().tolist(),
+        'O_chain_B': backbone_coords[:binderlen, 3].cpu().numpy().tolist(),
     }
     protein = {
         'name': 'complex',
         'seq': full_seq,
-        f'seq_chain_A': target_seq,
-        f'seq_chain_B': 'A' * binderlen,
+        'seq_chain_A': target_seq,
+        'seq_chain_B': 'A' * binderlen,
         'coords_chain_A': coords_dict_A,
         'coords_chain_B': coords_dict_B,
     }
@@ -694,7 +694,7 @@ class Sampler:
         seq_t_1 = torch.clone(seq_init)
         seq_t_1_str = seq2chars(torch.argmax(seq_t_1, dim=-1).tolist())
         if t > final_step:
-            if t - final_step <= 10:  # Periodic update
+            if t - final_step <= 10 and not self.potential_manager.is_empty_seq():
                 target_seq = seq_t_1_str[self.binderlen:]
                 binder_len = self.binderlen
                 one_hot_seq = predict_sequence_for_complex(
@@ -704,8 +704,7 @@ class Sampler:
                     binderlen=binder_len,
                     device=self.device
                 )
-                seq_t_1 = one_hot_seq.to(self.device)  # [L, 22]
-                seq_t_1_str = seq2chars(torch.argmax(seq_t_1, dim=-1).tolist())
+                seq_t_1_str = seq2chars(torch.argmax(one_hot_seq.to(self.device), dim=-1).tolist())
             else:
                 seq_t_1_str = None
             x_t_1, px0 = self.denoiser.get_next_pose(
@@ -809,7 +808,7 @@ class SelfConditioning(Sampler):
         target_seq = ""
         seq_t_1_str = seq2chars(torch.argmax(seq_t_1, dim=-1).tolist())
         if t > final_step:
-            if t - final_step <= 10:
+            if t - final_step <= 10 and not self.potential_manager.is_empty_seq():
                 target_seq = seq_t_1_str[self.binderlen:]
                 one_hot_seq = predict_sequence_for_complex(
                     model=self.proteinmpnn_model,
@@ -818,8 +817,7 @@ class SelfConditioning(Sampler):
                     binderlen=self.binderlen,
                     device=self.device
                 )
-                seq_t_1 = one_hot_seq.to(self.device)  # [L, 22]
-                seq_t_1_str = seq2chars(torch.argmax(seq_t_1, dim=-1).tolist())
+                seq_t_1_str = seq2chars(torch.argmax(one_hot_seq.to(self.device), dim=-1).tolist())
             else:
                 seq_t_1_str = None
             x_t_1, px0 = self.denoiser.get_next_pose(

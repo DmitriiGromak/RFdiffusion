@@ -725,6 +725,7 @@ class zdna_binder(Potential, torch.nn.Module):
         binder_norm = self.normalize_coords(binder_ca)
         zdna_norm = self.normalize_coords(self.zdna_ref)
         rmsd = self.robust_alignment(binder_norm, zdna_norm)
+        print(rmsd)
         score = torch.exp(-0.5 * (rmsd / self.sigma_mapping) ** 2)
         return self.weight * score
 
