@@ -710,33 +710,27 @@ class zdna_binder(Potential, torch.nn.Module):
     Potential of aliginment binder backbone to extracted Z-DNA 2' and 4' C atoms from a model Z-DNA structure(pdb: 3P4J)
     '''
 
-    def __init__(self, binderlen, sigma_align=5.0, sigma_mapping=10.0, weight=10.0):
+    def __init__(self, binderlen, weight=10.0):
         super().__init__()
         self.binderlen = binderlen
-        self.sigma_align = sigma_align
-        self.sigma_mapping = sigma_mapping
         self.weight = weight
         self.register_buffer('zdna_ref', torch.tensor(zdna_coords, dtype=torch.float32))
 
     def compute(self, xyz):
-        if not xyz.requires_grad:
-            xyz = xyz.detach().requires_grad_(True)
         binder_ca = xyz[:self.binderlen, 1]
-        binder_norm = self.normalize_coords(binder_ca)
-        zdna_norm = self.normalize_coords(self.zdna_ref)
+        binder_norm = self.center_coords(binder_ca)
+        zdna_norm = self.center_coords(self.zdna_ref)
         rmsd = self.robust_alignment(binder_norm, zdna_norm)
         print(rmsd)
-        score = torch.exp(-0.5 * (rmsd / self.sigma_mapping) ** 2)
-        return self.weight * score
+        return -self.weight * rmsd
 
-    def normalize_coords(self, coords):
+    def center_coords(self, coords):
         centered = coords - coords.mean(dim=0, keepdim=True)
-        std = centered.std(dim=0).mean().clamp(min=1e-6)
-        return centered / std
+        return centered
 
     def soft_assignment(self, P, Q):
         dists = torch.cdist(Q, P)
-        weights = torch.exp(-dists ** 2 / (2 * self.sigma_align ** 2 + 1e-6))
+        weights = torch.exp(-dists ** 2 / 2)
         return weights / (weights.sum(dim=1, keepdim=True) + 1e-6)
 
     def weighted_kabsch(self, P, Q, W):
@@ -757,7 +751,7 @@ class zdna_binder(Potential, torch.nn.Module):
         R = R * torch.sign(det).unsqueeze(-1).unsqueeze(-1)
         return R.to(dtype), (centroid_Q - centroid_P @ R).to(dtype)
 
-    def robust_alignment(self, P, Q, max_iter=10, tol=1e-3):
+    def robust_alignment(self, P, Q, max_iter=10):
         Q_current = Q.clone().requires_grad_(True)
         prev_rmsd = torch.tensor(float('inf'), device=P.device)
         rmsd = prev_rmsd
@@ -767,9 +761,8 @@ class zdna_binder(Potential, torch.nn.Module):
             Q_new = (Q_current @ R) + t
             residuals = torch.norm(Q_new - (W @ P), dim=1)
             rmsd = torch.sqrt(torch.mean(residuals ** 2) + 1e-6)
-            delta = torch.abs(prev_rmsd - rmsd)
-            Q_current = torch.where(delta < tol, Q_current.detach(), Q_new)
-            prev_rmsd = torch.where(delta < tol, prev_rmsd, rmsd)
+            Q_current = Q_new
+            rmsd = torch.where(prev_rmsd < rmsd, prev_rmsd, rmsd)
         return rmsd
 
 
