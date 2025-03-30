@@ -710,10 +710,9 @@ class zdna_binder(Potential, torch.nn.Module):
     Potential of aliginment binder backbone to extracted Z-DNA 2' and 4' C atoms from a model Z-DNA structure(pdb: 3P4J)
     '''
 
-    def __init__(self, binderlen, sigma_align=5.0, weight=10.0):
+    def __init__(self, binderlen, weight=10.0):
         super().__init__()
         self.binderlen = binderlen
-        self.sigma_align = sigma_align
         self.weight = weight
         self.register_buffer('zdna_ref', torch.tensor(zdna_coords, dtype=torch.float32))
 
@@ -727,25 +726,25 @@ class zdna_binder(Potential, torch.nn.Module):
 
     def center_coords(self, coords):
         centered = coords - coords.mean(dim=0, keepdim=True)
-        return centered
+        std = centered.std(dim=0).mean().clamp(min=1e-6)
+        return centered / std
 
     def soft_assignment(self, P, Q):
         dists = torch.cdist(Q, P)
-        weights = torch.exp(-dists ** 2 / (2 * self.sigma_align ** 2 + 1e-6))
-        return weights / (weights.sum(dim=1, keepdim=True) + 1e-6)
+        weights = torch.exp(-dists ** 2 / 2)
+        return weights / weights.sum(dim=1, keepdim=True)
 
     def weighted_kabsch(self, P, Q, W):
         dtype = P.dtype
         P = P.double()
         Q = Q.double()
         W = W.double()
-        w_sum = W.sum().clamp(min=1e-6)
+        w_sum = W.sum()
         centroid_P = (W.sum(dim=0) @ P) / w_sum
         centroid_Q = (W.sum(dim=1) @ Q) / w_sum
         P_cent = P - centroid_P
         Q_cent = Q - centroid_Q
         H = P_cent.T @ (W.T @ Q_cent)
-        H = H + torch.eye(3, device=H.device).double() * 1e-6
         U, _, Vh = torch.linalg.svd(H, full_matrices=False)
         R = Vh.T @ U.T
         det = torch.det(R)
