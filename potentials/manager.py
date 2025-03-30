@@ -238,4 +238,16 @@ class PotentialManager:
 
         '''
 
-        return (1 - t / self.T) * self.guide_scale
+        implemented_decay_types = {
+            'constant': lambda t: self.guide_scale,
+            # Linear interpolation with y2: 0, y1: guide_scale, x2: 0, x1: T, x: t
+            'linear': lambda t: (1 - t / self.T) * self.guide_scale,
+            'quadratic': lambda t: (1 - t ** 2 / self.T ** 2) * self.guide_scale,
+            'cubic': lambda t: (1 - t ** 3 / self.T ** 3) * self.guide_scale
+        }
+
+        if self.guide_decay not in implemented_decay_types:
+            sys.exit(
+                f'decay_type must be one of {implemented_decay_types.keys()}. Received decay_type={self.guide_decay}. Exiting.')
+
+        return implemented_decay_types[self.guide_decay](t)
