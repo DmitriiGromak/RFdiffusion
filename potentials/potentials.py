@@ -710,9 +710,10 @@ class zdna_binder(Potential, torch.nn.Module):
     Potential of aliginment binder backbone to extracted Z-DNA 2' and 4' C atoms from a model Z-DNA structure(pdb: 3P4J)
     '''
 
-    def __init__(self, binderlen, weight=10.0):
+    def __init__(self, binderlen, sigma_align=5.0, weight=10.0):
         super().__init__()
         self.binderlen = binderlen
+        self.sigma_align = sigma_align
         self.weight = weight
         self.register_buffer('zdna_ref', torch.tensor(zdna_coords, dtype=torch.float32))
 
@@ -731,7 +732,7 @@ class zdna_binder(Potential, torch.nn.Module):
 
     def soft_assignment(self, P, Q):
         dists = torch.cdist(Q, P)
-        weights = torch.exp(-dists ** 2 / 2)
+        weights = torch.exp(-dists ** 2 / (2 * self.sigma_align ** 2 + 1e-6))
         return weights / (weights.sum(dim=1, keepdim=True) + 1e-6)
 
     def weighted_kabsch(self, P, Q, W):
