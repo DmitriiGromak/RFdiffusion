@@ -732,19 +732,20 @@ class zdna_binder(Potential, torch.nn.Module):
     def soft_assignment(self, P, Q):
         dists = torch.cdist(Q, P)
         weights = torch.exp(-dists ** 2 / 2)
-        return weights / weights.sum(dim=1, keepdim=True)
+        return weights / (weights.sum(dim=1, keepdim=True) + 1e-6)
 
     def weighted_kabsch(self, P, Q, W):
         dtype = P.dtype
         P = P.double()
         Q = Q.double()
         W = W.double()
-        w_sum = W.sum()
+        w_sum = W.sum().clamp(min=1e-6)
         centroid_P = (W.sum(dim=0) @ P) / w_sum
         centroid_Q = (W.sum(dim=1) @ Q) / w_sum
         P_cent = P - centroid_P
         Q_cent = Q - centroid_Q
         H = P_cent.T @ (W.T @ Q_cent)
+        H = H + torch.eye(3, device=H.device).double() * 1e-6
         U, _, Vh = torch.linalg.svd(H, full_matrices=False)
         R = Vh.T @ U.T
         det = torch.det(R)
