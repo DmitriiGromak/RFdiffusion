@@ -694,7 +694,7 @@ class Sampler:
         seq_t_1 = torch.clone(seq_init)
         seq_t_1_str = seq2chars(torch.argmax(seq_t_1, dim=-1).tolist())
         if t > final_step:
-            if t - final_step <= 10 and not self.potential_manager.is_empty_seq():
+            if t - final_step <= (self.T - final_step) / 5 and not self.potential_manager.is_empty_seq():
                 target_seq = seq_t_1_str[self.binderlen:]
                 binder_len = self.binderlen
                 one_hot_seq = predict_sequence_for_complex(
@@ -808,7 +808,7 @@ class SelfConditioning(Sampler):
         target_seq = ""
         seq_t_1_str = seq2chars(torch.argmax(seq_t_1, dim=-1).tolist())
         if t > final_step:
-            if t - final_step <= 10 and not self.potential_manager.is_empty_seq():
+            if t - final_step <= (self.T - final_step) / 5 and not self.potential_manager.is_empty_seq():
                 target_seq = seq_t_1_str[self.binderlen:]
                 one_hot_seq = predict_sequence_for_complex(
                     model=self.proteinmpnn_model,

@@ -715,7 +715,6 @@ class zdna_binder(Potential, torch.nn.Module):
         binder_norm = self.center_coords(binder_ca)
         zdna_norm = self.center_coords(self.zdna_ref)
         rmsd = self.robust_alignment(binder_norm, zdna_norm)
-        print(rmsd)
         return -self.weight * rmsd
 
     def center_coords(self, coords):
@@ -886,7 +885,6 @@ class interface_forcefield(Potential):
         else:
             elec_energy = torch.tensor(0.0, device=xyz.device, dtype=xyz.dtype)
         total_energy = vdw_energy + elec_energy
-        print(total_energy)
         return -self.weight * total_energy
 
 
